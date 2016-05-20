@@ -9,6 +9,7 @@
 Thumbs.db
 /build
 
+.pid.lock
 /node_modules
 /bower_components
 /typings

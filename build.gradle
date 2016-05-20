@@ -1,14 +1,18 @@
+import com.wiredforcode.gradle.spawn.SpawnProcessTask
+
 buildscript {
     repositories {
         mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
         maven { url "https://plugins.gradle.org/m2/" }
+        maven { url "http://dl.bintray.com/vermeulen-mp/gradle-plugins" }
     }
     dependencies {
         classpath "org.grails:grails-gradle-plugin:$grailsVersion"
         classpath "com.bertramlabs.plugins:asset-pipeline-gradle:2.8.2"
         classpath "org.grails.plugins:hibernate4:5.0.5"
         classpath "com.moowork.gradle:gradle-node-plugin:0.12"
+        classpath "com.wiredforcode:gradle-spawn-plugin:0.6.0"
     }
 }
 
@@ -20,6 +24,7 @@ apply plugin: "org.grails.grails-web"
 apply plugin: "org.grails.grails-gsp"
 apply plugin: "asset-pipeline"
 apply plugin: "com.moowork.node"
+apply plugin: "com.wiredforcode.spawn"
 
 repositories {
     mavenLocal()
@@ -68,16 +73,29 @@ jar {
     archiveName 'ng2starter.jar'
 }
 
-task copyNodeModules(type: Copy) {
+task copyNodeModules(type: Copy, dependsOn: npm_install) {
     from 'node_modules'
     into 'grails-app/assets/lib'
 }
 
-task compileTypeScript(type: NpmTask) {
+task compileTypeScript(type: NpmTask, dependsOn: copyNodeModules) {
     args = ['run', 'tsc']
 }
 
-copyNodeModules.dependsOn npm_install
-compileTypeScript.dependsOn copyNodeModules
+task wipeDirectories(type: Exec) {
+    executable "sh"
+    args "-c", "rm -rf $projectDir/build;rm -rf $projectDir/node_modules;rm -rf $projectDir/typings; rm -rf $projectDir/grails-app/assets/lib"
+}
+
+task cleanUpPid(type: Delete) {
+    delete '.pid.lock'
+}
+
+task startTscWatch(type: SpawnProcessTask, dependsOn: [copyNodeModules, cleanUpPid]) {
+    command "npm run watch"
+    ready 'Compilation complete. Watching for file changes.'
+}
+
+bootRun.dependsOn startTscWatch
 assetCompile.dependsOn compileTypeScript
-bootRun.dependsOn compileTypeScript
+clean.dependsOn wipeDirectories
